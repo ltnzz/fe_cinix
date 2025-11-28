@@ -40,8 +40,8 @@ export default function HomePage({ onNavigateHome, onNavigateLogin, onNavigateSe
         let url = `${API_BASE_URL}/recommendation`;
         const config = {};
         if (user && user.id) {
-           url = `${API_BASE_URL}/recommendations/${user.id}`;
-           config.withCredentials = true; 
+            url = `${API_BASE_URL}/recommendations/${user.id}`;
+            config.withCredentials = true; 
         }
         const res = await axios.get(url, config);
         const data = res.data.data || res.data;
@@ -57,6 +57,17 @@ export default function HomePage({ onNavigateHome, onNavigateLogin, onNavigateSe
   const moviesForSwiper = movies.length > 0 && movies.length < 8 ? [...movies, ...movies, ...movies] : movies;
 
   if (loading && movies.length === 0) return <div className="min-h-screen bg-[#6a8e7f] flex items-center justify-center text-white animate-pulse font-bold text-xl">Loading Cinema...</div>;
+
+  // Tambahkan ini di dalam HomePage, sebelum return
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/logout`, {}, { withCredentials: true });
+      // reset state user di parent / redirect
+      if (onLogoutClick) onLogoutClick();
+    } catch (err) {
+      console.error("Gagal logout:", err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#6a8e7f] text-gray-900 font-sans selection:bg-amber-500 selection:text-black">
