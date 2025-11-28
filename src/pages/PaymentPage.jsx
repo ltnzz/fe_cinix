@@ -111,13 +111,14 @@ export default function PaymentPage({ movie, cinema, time, user, quantity, seats
     setLoading(true);
     try {
       const payload = {
-        schedule_id: movie.schedule_id,  // HARUS dari movie
+        schedule_id: movie.schedule_id, // HARUS dari movie
         seats,
         amount: totalAmount,
       };
 
       if (!payload.schedule_id) {
         alert("schedule_id tidak ditemukan. Pastikan dari BookingPage.");
+        setLoading(false);
         return;
       }
 
@@ -132,6 +133,7 @@ export default function PaymentPage({ movie, cinema, time, user, quantity, seats
 
       if (!midtransUrl) {
         alert("Gagal mendapatkan link pembayaran");
+        setLoading(false);
         return;
       }
 
@@ -181,7 +183,7 @@ export default function PaymentPage({ movie, cinema, time, user, quantity, seats
         <button
           onClick={handlePayment}
           disabled={loading}
-          className="w-full bg-[#2a4c44] text-white py-4 rounded-full font-bold text-lg hover:bg-[#1e3630]"
+          className="w-full bg-[#2a4c44] text-white py-4 rounded-full font-bold text-lg hover:bg-[#1e3630] flex items-center justify-center gap-2"
         >
           {loading ? "Sedang Memproses..." : <><ShieldCheck /> Lanjut ke Pembayaran</>}
         </button>
