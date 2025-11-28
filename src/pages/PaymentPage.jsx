@@ -173,15 +173,9 @@ export default function PaymentPage({ onNavigateHome, movie, cinema, time, user,
     } catch (error) {
       console.error("ERROR PAYMENT:", error);
       
-      if (error.response) {
-          // ERROR 401 = MASALAH TOKEN
-          if (error.response.status === 401) {
-              alert("Sesi login berakhir. Backend menolak token Anda. Silakan Login Ulang.");
-              localStorage.removeItem("token");
-              navigate('/login');
-          } 
+      if (error.response) { 
           // ERROR 400/404/500 = MASALAH DATA
-          else {
+          if (error.response.status === 404){
               const msg = error.response.data?.message || "Gagal memproses transaksi.";
               alert(`Gagal: ${msg}`);
           }
