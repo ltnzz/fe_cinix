@@ -1,8 +1,9 @@
 import React, { useState } from "react";
-import { Home, User, Ticket, Heart, ChevronLeft } from "lucide-react";
+import { Home, User, Ticket, Heart, ChevronLeft, Loader2, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-// --- COMPONENTS KECIL ---
+const API_PAYMENT = "https://cinix-be.vercel.app/payment";
 
 function BookingHeader({ onNavigateHome, onNavigateLogin, movieTitle, cinemaName, onBack }) {
   return (
@@ -51,66 +52,71 @@ const LegendItem = ({ colorClass, text }) => (
   </div>
 );
 
-// --- LOGIC KURSI (Tetap sama, cuma dirapikan) ---
 const rows = ["K", "J", "I", "H", "G", "F", "E", "D", "C", "B", "A"]; 
-const leftSeatNumbers = [8, 7, 6, 5];
-const centerSeatNumbers = [4, 3, 2, 1]; // Saya bagi 2 blok biar kayak bioskop beneran
-
 const createSeats = () => {
   const seats = [];
   rows.forEach((row) => {
-    // Blok Kiri
-    [8,7,6,5].forEach(num => seats.push({ id: `${row}${num}`, row, status: Math.random() < 0.1 ? 'taken' : 'available', block: 'left' }));
-    // Blok Kanan
-    [4,3,2,1].forEach(num => seats.push({ id: `${row}${num}`, row, status: Math.random() < 0.1 ? 'taken' : 'available', block: 'right' }));
+    [8,7,6,5].forEach(num => seats.push({ id: `${row}${num}`, row, status: Math.random() < 0.1 ? 'taken' : 'available' }));
+    [4,3,2,1].forEach(num => seats.push({ id: `${row}${num}`, row, status: Math.random() < 0.1 ? 'taken' : 'available' }));
   });
   return seats;
 };
 
-// --- MAIN PAGE ---
 export default function BookingPage({ movie, cinema, time, onNavigateHome, onNavigateLogin }) {
   const navigate = useNavigate();
   const [allSeats] = useState(createSeats());
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [loading, setLoading] = useState(false);
   
   const ticketPrice = 50000;
+  const adminFee = 3000;
 
-  // Fallback Data agar tidak error saat refresh
   const displayMovie = movie || {
     title: "TRON ARES (2025)",
     poster_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8tq8lygfqv4hEIDsAjS88Rdh-z99CusKQyg&s",
+    schedule_id: "demo-schedule-123" // fallback
   };
   const displayCinema = cinema || "AEON MALL TANJUNG BARAT XXI";
   const displayTime = time || "12:30";
 
   const toggleSeat = (id) => {
-    if (selectedSeats.includes(id)) {
-      setSelectedSeats(selectedSeats.filter((seatId) => seatId !== id));
-    } else {
-      setSelectedSeats([...selectedSeats, id]);
-    }
+    if (selectedSeats.includes(id)) setSelectedSeats(selectedSeats.filter(s => s !== id));
+    else setSelectedSeats([...selectedSeats, id]);
   };
 
   const getSeatStatus = (id) => {
     if (selectedSeats.includes(id)) return "selected";
-    const seat = allSeats.find((s) => s.id === id);
+    const seat = allSeats.find(s => s.id === id);
     return seat ? seat.status : "available";
   };
 
-  const totalPrice = selectedSeats.length * ticketPrice;
-  
-  // --- FUNGSI NAVIGASI KE PAYMENT ---
-  const handleProceedToPayment = () => {
-     navigate('/payment', {
-        state: {
-            movie: displayMovie,
-            cinema: displayCinema,
-            time: displayTime,
-            seats: selectedSeats, // Kirim data kursi yg dipilih
-            totalPrice: totalPrice,
-            quantity: selectedSeats.length
-        }
-     });
+  const totalPrice = selectedSeats.length * ticketPrice + adminFee;
+
+  const handleProceedToPayment = async () => {
+    if (!displayMovie.schedule_id || selectedSeats.length === 0) return alert("Pilih kursi terlebih dahulu!");
+
+    setLoading(true);
+    try {
+      const payload = {
+        schedule_id: displayMovie.schedule_id,
+        seats: selectedSeats,
+        amount: totalPrice
+      };
+      const res = await axios.post(API_PAYMENT, payload, {
+        withCredentials: true,
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const redirectUrl = res.data.snap?.redirect_url || res.data.payment?.midtrans_response?.redirect_url;
+      if (!redirectUrl) throw new Error("Gagal mendapatkan URL pembayaran");
+
+      window.location.href = redirectUrl; // langsung ke Midtrans
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || err.message || "Gagal memproses pembayaran");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -123,43 +129,42 @@ export default function BookingPage({ movie, cinema, time, onNavigateHome, onNav
         cinemaName={displayCinema}
       />
 
+      {loading && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 flex flex-col items-center">
+            <Loader2 size={48} className="text-amber-500 animate-spin mb-4" />
+            <h2 className="text-xl font-bold text-[#2a4c44]">Menghubungkan ke Pembayaran...</h2>
+          </div>
+        </div>
+      )}
+
       <div className="flex-grow flex flex-col lg:flex-row p-4 md:p-6 gap-6 max-w-7xl mx-auto w-full">
         
         {/* SEAT SELECTION AREA */}
         <div className="flex-grow bg-[#f5f1dc] p-4 md:p-8 rounded-3xl shadow-xl text-[#2a4c44] flex flex-col items-center">
           <h2 className="text-xl font-black mb-6 self-start">Pilih Kursi</h2>
 
-          {/* SCREEN */}
           <div className="w-full max-w-2xl mb-12 relative">
              <div className="h-2 bg-gray-400 rounded-full w-full shadow-[0_10px_30px_rgba(0,0,0,0.2)]"></div>
              <p className="text-center text-xs font-bold text-gray-400 mt-4 tracking-[0.3em]">LAYAR BIOSKOP</p>
-             {/* Efek Cahaya Layar */}
              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-gradient-to-b from-white/20 to-transparent blur-xl pointer-events-none"></div>
           </div>
 
-          {/* SEATS GRID */}
           <div className="flex flex-col gap-2 md:gap-3 overflow-x-auto pb-4 w-full items-center">
             {rows.map((row) => (
               <div key={row} className="flex gap-4 md:gap-8 items-center">
-                {/* Blok Kiri */}
-                <div className="flex gap-1 md:gap-2">
-                   {[8,7,6,5].map(num => {
-                      const id = `${row}${num}`;
-                      return <Seat key={id} id={id} status={getSeatStatus(id)} onClick={toggleSeat} />;
-                   })}
-                </div>
-                {/* Blok Kanan */}
-                <div className="flex gap-1 md:gap-2">
-                   {[4,3,2,1].map(num => {
-                      const id = `${row}${num}`;
-                      return <Seat key={id} id={id} status={getSeatStatus(id)} onClick={toggleSeat} />;
-                   })}
-                </div>
+                {[8,7,6,5].map(num => {
+                   const id = `${row}${num}`;
+                   return <Seat key={id} id={id} status={getSeatStatus(id)} onClick={toggleSeat} />;
+                })}
+                {[4,3,2,1].map(num => {
+                   const id = `${row}${num}`;
+                   return <Seat key={id} id={id} status={getSeatStatus(id)} onClick={toggleSeat} />;
+                })}
               </div>
             ))}
           </div>
 
-          {/* LEGEND */}
           <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-10 pt-6 border-t border-[#2a4c44]/10 w-full">
             <LegendItem colorClass="bg-white border border-gray-300" text="Tersedia" />
             <LegendItem colorClass="bg-[#6a8e7f]" text="Dipilih" />
@@ -167,7 +172,7 @@ export default function BookingPage({ movie, cinema, time, onNavigateHome, onNav
           </div>
         </div>
 
-        {/* ORDER SUMMARY (SIDEBAR) */}
+        {/* ORDER SUMMARY */}
         <div className="w-full lg:w-96 flex-shrink-0">
             <div className="bg-white p-6 rounded-3xl shadow-xl sticky top-24">
                 <h2 className="text-xl font-black text-[#2a4c44] mb-6">Ringkasan Pesanan</h2>
@@ -209,10 +214,10 @@ export default function BookingPage({ movie, cinema, time, onNavigateHome, onNav
 
                 <button
                     onClick={handleProceedToPayment}
-                    disabled={selectedSeats.length === 0}
-                    className="w-full py-4 bg-[#2a4c44] text-white font-bold rounded-xl shadow-lg hover:bg-[#1e3630] hover:shadow-xl hover:-translate-y-1 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0"
+                    disabled={selectedSeats.length === 0 || loading}
+                    className="w-full py-4 bg-[#2a4c44] text-white font-bold rounded-xl shadow-lg hover:bg-[#1e3630] hover:shadow-xl hover:-translate-y-1 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2"
                 >
-                    Lanjut Pembayaran
+                    {loading ? <Loader2 className="animate-spin" /> : <ShieldCheck />} Bayar Sekarang
                 </button>
             </div>
         </div>
