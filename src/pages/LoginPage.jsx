@@ -42,7 +42,7 @@ export default function LoginPage({ onNavigateRegister, onNavigateForgotPassword
     setErrorMessage("");
 
     try {
-      const response = await axiosClient.post("/login", formData, { withCredentials: true });
+      const response = await axiosClient.post("/login", formData);
 
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);
