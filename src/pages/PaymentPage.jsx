@@ -207,12 +207,12 @@ export default function PaymentPage({ onNavigateHome, movie, cinema, time, user,
         <MovieSummaryCard movie={movie} cinema={cinema} time={time} quantity={quantity} seats={seats} />
         
         <div className="bg-white rounded-3xl p-6 shadow-lg mb-6">
-           <h3 className="font-bold text-[#2a4c44] mb-4">Metode Pembayaran</h3>
-           <div className="space-y-3">
-               {methods.map((method) => (
-                   <PaymentMethodItem key={method.id} id={method.id} name={method.name} iconUrl={method.icon} isSelected={paymentMethod === method.id} onClick={setPaymentMethod} />
-               ))}
-           </div>
+            <h3 className="font-bold text-[#2a4c44] mb-4">Metode Pembayaran</h3>
+            <div className="space-y-3">
+                {methods.map((method) => (
+                    <PaymentMethodItem key={method.id} id={method.id} name={method.name} iconUrl={method.icon} isSelected={paymentMethod === method.id} onClick={setPaymentMethod} />
+                ))}
+            </div>
         </div>
 
         <PriceSummary pricePerTicket={pricePerTicket} quantity={quantity} adminFee={adminFee} totalAmount={totalAmount} />
