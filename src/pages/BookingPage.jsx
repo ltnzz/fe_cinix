@@ -1,227 +1,171 @@
-import React, { useState } from "react";
-import { Home, User, Ticket, Heart, ChevronLeft, Loader2, ShieldCheck } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { ChevronLeft, Loader2 } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
-const API_PAYMENT = "https://cinix-be.vercel.app/payment";
+const API_BASE_URL = "https://cinix-be.vercel.app";
 
-function BookingHeader({ onNavigateHome, onNavigateLogin, movieTitle, cinemaName, onBack }) {
-  return (
-    <header className="flex items-center justify-between px-6 md:px-8 py-4 bg-[#f5f1dc] shadow sticky top-0 z-50">
-      <button onClick={onBack} className="flex items-center gap-2 text-[#2a4c44] font-semibold hover:opacity-70 transition">
-        <ChevronLeft size={24} />
-      </button>
-
-      <div className="flex flex-col items-center">
-        <h1 className="text-lg md:text-xl font-bold text-[#2a4c44] text-center line-clamp-1">{movieTitle}</h1>
-        <span className="text-xs md:text-sm text-gray-600">{cinemaName}</span>
-      </div>
-
-      <div className="flex gap-4 md:gap-6 text-[#2a4c44]">
-        <button onClick={onNavigateHome} className="hover:opacity-70"><Home /></button>
-        <button onClick={onNavigateLogin} className="hidden md:block hover:opacity-70"><User /></button>
-      </div>
-    </header>
-  );
-}
-
-const Seat = ({ status = "available", id, onClick }) => {
-  const getSeatClass = () => {
-    switch (status) {
-      case "selected": return "bg-[#6a8e7f] text-white shadow-md transform scale-105 border-transparent"; 
-      case "taken": return "bg-gray-300 text-gray-400 cursor-not-allowed border-transparent";
-      default: return "bg-white text-[#2a4c44] hover:bg-[#6a8e7f]/20 border border-gray-300";
-    }
-  };
+// --- SEAT COMPONENT ---
+const Seat = ({ seat, isSelected, onClick }) => {
+  const className = seat.is_available
+    ? isSelected
+      ? "bg-[#6a8e7f] text-white shadow-md scale-105"
+      : "bg-white text-[#2a4c44] hover:bg-[#6a8e7f]/20 border border-gray-300"
+    : "bg-gray-300 text-gray-400 cursor-not-allowed";
 
   return (
     <button
-      onClick={() => onClick(id)}
-      disabled={status === "taken"}
-      className={`w-7 h-7 md:w-9 md:h-9 rounded-t-lg text-[10px] md:text-xs font-bold transition-all duration-200 ${getSeatClass()}`}
+      onClick={() => seat.is_available && onClick(seat.seat_number)}
+      disabled={!seat.is_available}
+      className={`w-8 h-8 md:w-10 md:h-10 rounded text-sm md:text-base font-bold transition ${className}`}
     >
-      {id}
+      {seat.seat_number}
     </button>
   );
 };
 
-const LegendItem = ({ colorClass, text }) => (
-  <div className="flex items-center gap-2">
-    <div className={`w-4 h-4 rounded ${colorClass}`}></div>
-    <span className="text-xs md:text-sm text-[#2a4c44] font-medium">{text}</span>
+// --- LEGEND ---
+const Legend = () => (
+  <div className="flex gap-4 mt-6">
+    <div className="flex items-center gap-1">
+      <div className="w-4 h-4 bg-white border border-gray-300 rounded"></div>
+      <span className="text-sm text-[#2a4c44]">Tersedia</span>
+    </div>
+    <div className="flex items-center gap-1">
+      <div className="w-4 h-4 bg-[#6a8e7f] rounded"></div>
+      <span className="text-sm text-[#2a4c44]">Dipilih</span>
+    </div>
+    <div className="flex items-center gap-1">
+      <div className="w-4 h-4 bg-gray-300 rounded"></div>
+      <span className="text-sm text-[#2a4c44]">Terisi</span>
+    </div>
   </div>
 );
 
-const rows = ["K", "J", "I", "H", "G", "F", "E", "D", "C", "B", "A"]; 
-const createSeats = () => {
-  const seats = [];
-  rows.forEach((row) => {
-    [8,7,6,5].forEach(num => seats.push({ id: `${row}${num}`, row, status: Math.random() < 0.1 ? 'taken' : 'available' }));
-    [4,3,2,1].forEach(num => seats.push({ id: `${row}${num}`, row, status: Math.random() < 0.1 ? 'taken' : 'available' }));
-  });
-  return seats;
-};
-
-export default function BookingPage({ movie, cinema, time, onNavigateHome, onNavigateLogin }) {
+export default function BookingPage({ movie, cinema, time, userId }) {
   const navigate = useNavigate();
-  const [allSeats] = useState(createSeats());
+  const { studioId } = useParams();
+  const [seats, setSeats] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [loading, setLoading] = useState(false);
-  
+
   const ticketPrice = 50000;
-  const adminFee = 3000;
 
-  const displayMovie = movie || {
-    title: "TRON ARES (2025)",
-    poster_url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8tq8lygfqv4hEIDsAjS88Rdh-z99CusKQyg&s",
-    schedule_id: "demo-schedule-123" // fallback
+  useEffect(() => {
+    const fetchSeats = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/studios/${studioId}/seats`);
+        setSeats(res.data); // pastikan backend kirim array of seats
+      } catch (err) {
+        console.error("Failed to fetch seats:", err);
+      }
+    };
+    fetchSeats();
+  }, [studioId]);
+
+  const toggleSeat = (seatNumber) => {
+    if (selectedSeats.includes(seatNumber)) {
+      setSelectedSeats(selectedSeats.filter((s) => s !== seatNumber));
+    } else {
+      setSelectedSeats([...selectedSeats, seatNumber]);
+    }
   };
-  const displayCinema = cinema || "AEON MALL TANJUNG BARAT XXI";
-  const displayTime = time || "12:30";
 
-  const toggleSeat = (id) => {
-    if (selectedSeats.includes(id)) setSelectedSeats(selectedSeats.filter(s => s !== id));
-    else setSelectedSeats([...selectedSeats, id]);
-  };
-
-  const getSeatStatus = (id) => {
-    if (selectedSeats.includes(id)) return "selected";
-    const seat = allSeats.find(s => s.id === id);
-    return seat ? seat.status : "available";
-  };
-
-  const totalPrice = selectedSeats.length * ticketPrice + adminFee;
-
-  const handleProceedToPayment = async () => {
-    if (!displayMovie.schedule_id || selectedSeats.length === 0) return alert("Pilih kursi terlebih dahulu!");
+  const handlePayment = async () => {
+    if (!selectedSeats.length) return alert("Pilih kursi dulu!");
 
     setLoading(true);
     try {
       const payload = {
-        schedule_id: displayMovie.schedule_id,
+        schedule_id: studioId, // backend nanti sesuaikan
         seats: selectedSeats,
-        amount: totalPrice
+        user_id: userId,
+        amount: ticketPrice * selectedSeats.length,
       };
-      const res = await axios.post(API_PAYMENT, payload, {
+
+      const res = await axios.post(`${API_BASE_URL}/payment`, payload, {
         withCredentials: true,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
 
-      const redirectUrl = res.data.snap?.redirect_url || res.data.payment?.midtrans_response?.redirect_url;
-      if (!redirectUrl) throw new Error("Gagal mendapatkan URL pembayaran");
+      const redirectUrl =
+        res.data.snap?.redirect_url || res.data.payment?.midtrans_response?.redirect_url;
 
-      window.location.href = redirectUrl; // langsung ke Midtrans
+      if (!redirectUrl) return alert("Gagal mendapatkan link pembayaran");
+
+      window.location.href = redirectUrl;
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || err.message || "Gagal memproses pembayaran");
+      alert(err.response?.data?.message || "Gagal memproses pembayaran");
     } finally {
       setLoading(false);
     }
   };
 
+  // --- Layout per row (ambil dari seats backend) ---
+  const rows = Array.from(new Set(seats.map((s) => s.seat_number[0]))).sort(); // ambil huruf row
+  const seatsByRow = rows.map((row) =>
+    seats.filter((s) => s.seat_number.startsWith(row)).sort((a, b) =>
+      parseInt(a.seat_number.slice(1)) - parseInt(b.seat_number.slice(1))
+    )
+  );
+
   return (
-    <div className="min-h-screen bg-[#6a8e7f] flex flex-col font-sans">
-      <BookingHeader
-        onBack={() => navigate(-1)}
-        onNavigateHome={onNavigateHome}
-        onNavigateLogin={onNavigateLogin}
-        movieTitle={displayMovie.title}
-        cinemaName={displayCinema}
-      />
+    <div className="min-h-screen bg-[#f5f1dc] font-sans p-4">
+      <header className="flex items-center justify-between mb-4">
+        <button onClick={() => navigate(-1)} className="flex items-center gap-2">
+          <ChevronLeft size={24} />
+          Kembali
+        </button>
+        <h1 className="font-bold text-xl">{movie?.title || "Movie Title"}</h1>
+      </header>
 
       {loading && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-8 flex flex-col items-center">
-            <Loader2 size={48} className="text-amber-500 animate-spin mb-4" />
-            <h2 className="text-xl font-bold text-[#2a4c44]">Menghubungkan ke Pembayaran...</h2>
-          </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Loader2 className="animate-spin text-white" size={48} />
         </div>
       )}
 
-      <div className="flex-grow flex flex-col lg:flex-row p-4 md:p-6 gap-6 max-w-7xl mx-auto w-full">
-        
-        {/* SEAT SELECTION AREA */}
-        <div className="flex-grow bg-[#f5f1dc] p-4 md:p-8 rounded-3xl shadow-xl text-[#2a4c44] flex flex-col items-center">
-          <h2 className="text-xl font-black mb-6 self-start">Pilih Kursi</h2>
-
-          <div className="w-full max-w-2xl mb-12 relative">
-             <div className="h-2 bg-gray-400 rounded-full w-full shadow-[0_10px_30px_rgba(0,0,0,0.2)]"></div>
-             <p className="text-center text-xs font-bold text-gray-400 mt-4 tracking-[0.3em]">LAYAR BIOSKOP</p>
-             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-20 bg-gradient-to-b from-white/20 to-transparent blur-xl pointer-events-none"></div>
-          </div>
-
-          <div className="flex flex-col gap-2 md:gap-3 overflow-x-auto pb-4 w-full items-center">
-            {rows.map((row) => (
-              <div key={row} className="flex gap-4 md:gap-8 items-center">
-                {[8,7,6,5].map(num => {
-                   const id = `${row}${num}`;
-                   return <Seat key={id} id={id} status={getSeatStatus(id)} onClick={toggleSeat} />;
-                })}
-                {[4,3,2,1].map(num => {
-                   const id = `${row}${num}`;
-                   return <Seat key={id} id={id} status={getSeatStatus(id)} onClick={toggleSeat} />;
-                })}
-              </div>
-            ))}
-          </div>
-
-          <div className="flex flex-wrap justify-center gap-4 md:gap-8 mt-10 pt-6 border-t border-[#2a4c44]/10 w-full">
-            <LegendItem colorClass="bg-white border border-gray-300" text="Tersedia" />
-            <LegendItem colorClass="bg-[#6a8e7f]" text="Dipilih" />
-            <LegendItem colorClass="bg-gray-300" text="Terisi" />
-          </div>
+      <div className="flex flex-col items-center">
+        <div className="w-full max-w-xl mb-6 relative">
+          <div className="h-2 bg-gray-400 rounded-full w-full shadow-inner"></div>
+          <p className="text-center text-gray-500 text-xs mt-2 tracking-[0.3em]">LAYAR BIOSKOP</p>
         </div>
 
-        {/* ORDER SUMMARY */}
-        <div className="w-full lg:w-96 flex-shrink-0">
-            <div className="bg-white p-6 rounded-3xl shadow-xl sticky top-24">
-                <h2 className="text-xl font-black text-[#2a4c44] mb-6">Ringkasan Pesanan</h2>
-                
-                <div className="flex gap-4 mb-6">
-                    <img
-                        src={displayMovie.poster_url || displayMovie.img}
-                        alt={displayMovie.title}
-                        className="w-24 h-36 object-cover rounded-xl shadow-md bg-gray-200"
-                    />
-                    <div>
-                        <h3 className="font-bold text-[#2a4c44] leading-tight mb-1">{displayMovie.title}</h3>
-                        <p className="text-sm text-gray-500 font-medium mb-2">{displayCinema}</p>
-                        <div className="inline-block bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold">
-                             {displayTime} WIB
-                        </div>
-                    </div>
-                </div>
-
-                <div className="border-t border-dashed border-gray-300 py-4 space-y-3">
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Kursi Dipilih</span>
-                        <span className="font-bold text-[#2a4c44] text-right max-w-[120px]">
-                            {selectedSeats.length > 0 ? selectedSeats.join(", ") : "-"}
-                        </span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Harga Satuan</span>
-                        <span className="font-medium">Rp {ticketPrice.toLocaleString('id-ID')}</span>
-                    </div>
-                </div>
-
-                <div className="border-t border-gray-200 py-4 flex justify-between items-center mb-4">
-                    <span className="text-lg font-bold text-[#2a4c44]">Total</span>
-                    <span className="text-2xl font-black text-amber-500">
-                        Rp {totalPrice.toLocaleString('id-ID')}
-                    </span>
-                </div>
-
-                <button
-                    onClick={handleProceedToPayment}
-                    disabled={selectedSeats.length === 0 || loading}
-                    className="w-full py-4 bg-[#2a4c44] text-white font-bold rounded-xl shadow-lg hover:bg-[#1e3630] hover:shadow-xl hover:-translate-y-1 transition-all disabled:bg-gray-300 disabled:cursor-not-allowed disabled:shadow-none disabled:translate-y-0 flex items-center justify-center gap-2"
-                >
-                    {loading ? <Loader2 className="animate-spin" /> : <ShieldCheck />} Bayar Sekarang
-                </button>
+        <div className="flex flex-col gap-2">
+          {seatsByRow.map((rowSeats, i) => (
+            <div key={i} className="flex justify-center gap-2">
+              {rowSeats.map((seat) => (
+                <Seat
+                  key={seat.id_seat}
+                  seat={seat}
+                  isSelected={selectedSeats.includes(seat.seat_number)}
+                  onClick={toggleSeat}
+                />
+              ))}
             </div>
+          ))}
         </div>
 
+        <Legend />
+
+        <div className="mt-6 w-full max-w-xl bg-white p-4 rounded-2xl shadow-lg">
+          <p>
+            Kursi Dipilih: {selectedSeats.length ? selectedSeats.join(", ") : "-"}
+          </p>
+          <p>Harga: Rp {ticketPrice.toLocaleString("id-ID")}/kursi</p>
+          <p className="font-bold text-lg mt-2">
+            Total: Rp {(ticketPrice * selectedSeats.length).toLocaleString("id-ID")}
+          </p>
+
+          <button
+            onClick={handlePayment}
+            disabled={!selectedSeats.length || loading}
+            className="w-full mt-4 py-3 bg-[#2a4c44] text-white rounded-xl font-bold hover:bg-[#1e3630] disabled:bg-gray-300"
+          >
+            Bayar Sekarang
+          </button>
+        </div>
       </div>
     </div>
   );
