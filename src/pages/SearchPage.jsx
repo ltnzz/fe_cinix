@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from "react";
 import { Search, ChevronRight, MapPin } from "lucide-react";
+// --- FIX: Tambahkan import ini supaya tidak blank screen ---
+import { useNavigate } from "react-router-dom";
 
-// --- IMPORT HEADER REUSABLE ---
-import DetailHeader from "../components/detMovieHeader";
+// Import Header (Sesuaikan nama file header kamu)
+import DetailHeader from "../components/detMovieHeader"; // Atau "../components/detMovieHeader" kalau kamu pake nama itu
 
-// --- DATA BIOSKOP JABODETABEK (MOCK DATA) ---
 const CINEMA_DATABASE = [
   // JAKARTA
   { id: 1, city: "JAKARTA", name: "AEON MALL TANJUNG BARAT XXI", brand: "XXI" },
@@ -44,8 +45,6 @@ const CINEMA_DATABASE = [
 ];
 
 const CITIES = ["JAKARTA", "BOGOR", "DEPOK", "TANGERANG", "BEKASI"];
-
-// --- COMPONENTS ---
 
 const CityChip = ({ city, isActive, onClick }) => (
   <button
@@ -87,10 +86,10 @@ const CinemaRow = ({ name, brand, onSelect }) => (
 );
 
 export default function SearchPage({ onNavigateHome, onNavigateLogin }) {
+  const navigate = useNavigate();
   const [activeCity, setActiveCity] = useState("JAKARTA");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Logic Filtering: Filter berdasarkan Kota AKTIF & Text Search
   const filteredCinemas = useMemo(() => {
     return CINEMA_DATABASE.filter((cinema) => {
       const isCityMatch = cinema.city === activeCity;
@@ -99,9 +98,15 @@ export default function SearchPage({ onNavigateHome, onNavigateLogin }) {
     });
   }, [activeCity, searchQuery]);
 
+  const handleSelectCinema = (cinema) => {
+      // Navigasi ke halaman detail bioskop dengan membawa data bioskop
+      navigate(`/cinema/${cinema.id}`, { 
+          state: { cinemaData: cinema } 
+      });
+  };
+
   return (
     <div className="min-h-screen bg-[#6a8e7f] flex flex-col">
-      {/* 1. Reuse Header */}
       <DetailHeader 
         onNavigateHome={onNavigateHome} 
         onNavigateLogin={onNavigateLogin} 
@@ -114,7 +119,6 @@ export default function SearchPage({ onNavigateHome, onNavigateLogin }) {
             <p className="text-gray-200">Temukan bioskop terdekat di kotamu.</p>
         </div>
 
-        {/* SEARCH BAR */}
         <div className="relative mb-8 group">
           <input
             type="text"
@@ -129,7 +133,6 @@ export default function SearchPage({ onNavigateHome, onNavigateLogin }) {
           />
         </div>
 
-        {/* CITY FILTERS */}
         <div className="flex flex-wrap gap-3 mb-8">
           {CITIES.map((city) => (
             <CityChip
@@ -141,7 +144,6 @@ export default function SearchPage({ onNavigateHome, onNavigateLogin }) {
           ))}
         </div>
 
-        {/* RESULTS LIST */}
         <div className="space-y-4 pb-20">
           {filteredCinemas.length > 0 ? (
             filteredCinemas.map((cinema) => (
@@ -149,9 +151,7 @@ export default function SearchPage({ onNavigateHome, onNavigateLogin }) {
                 key={cinema.id}
                 name={cinema.name}
                 brand={cinema.brand}
-                onSelect={() =>
-                  alert(`Kamu memilih bioskop: ${cinema.name}`)
-                }
+                onSelect={() => handleSelectCinema(cinema)}
               />
             ))
           ) : (

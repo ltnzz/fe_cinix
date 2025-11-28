@@ -12,6 +12,7 @@ import BookingPage from "./pages/BookingPage.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx"; 
 import MyTicketsPage from "./pages/MyTicketsPage";
 import WishlistPage from "./pages/WishlistPage";
+import CinemaDetailPage from "./pages/CinemaDetailPage";
 
 const DetailWrapper = ({ baseProps }) => {
   const location = useLocation();
@@ -99,6 +100,7 @@ return (
         <Route path="/payment" element={<PaymentWrapper baseProps={navProps} />} />
         <Route path="/mytickets" element={<MyTicketsPage user={currentUser} />} />
         <Route path="/wishlist" element={<WishlistPage {...navProps} />} />
+        <Route path="/cinema/:id" element={<CinemaDetailPage {...navProps} />} />
       </Routes>
 
       {showLogoutModal && (

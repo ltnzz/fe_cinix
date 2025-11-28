@@ -36,7 +36,12 @@ export default function LoginPage({ onNavigateRegister, onNavigateForgotPassword
 
     try {
       const endpoint = "https://cinix-be.vercel.app/login";
-      const response = await axios.post(endpoint, formData);
+      const response = await axios.post(endpoint, formData, {
+        withCredentials: true,
+        headers: {
+        'Content-Type': 'application/json'
+        }
+      });
 
       if (response.data.token) {
         localStorage.setItem("token", response.data.token);

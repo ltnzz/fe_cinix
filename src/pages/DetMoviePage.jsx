@@ -1,9 +1,12 @@
 import React, { useState } from "react";
-import { Clock, Filter, Search, PlayCircle, Lock, X } from "lucide-react";
+// PASTIKAN SEMUA ICON INI DI-IMPORT (Termasuk Heart)
+import { Clock, Filter, Search, PlayCircle, Lock, X, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+// Pastikan path ini benar
 import DetailHeader from "../components/detMovieHeader";
 
-// --- HELPER COMPONENTS (Chip Tanggal & Kota) ---
+// --- HELPER COMPONENTS (DateChip & CityChip) ---
 const DateChip = ({ day, date, isActive, onClick }) => (
   <button
     onClick={onClick}
@@ -37,15 +40,18 @@ export default function DetailPage({
   onNavigateHome,
   onNavigateLogin,
   onNavigateBooking,
-  user, // <--- PENTING: Prop user harus diterima disini
+  user,
 }) {
-  const navigate = useNavigate(); // Digunakan untuk tombol Login di dalam Modal
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("jadwal");
   const [activeDate, setActiveDate] = useState("11");
   const [activeCity, setActiveCity] = useState("JAKARTA");
   
   // STATE MODAL POPUP
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // STATE BARU: WISHLIST (Lokal dulu)
+  const [isWishlisted, setIsWishlisted] = useState(false);
 
   // --- DATA MOCKUP ---
   const dates = [
@@ -55,7 +61,7 @@ export default function DetailPage({
   ];
   const cities = ["JAKARTA", "BOGOR", "DEPOK", "TANGERANG", "BEKASI"];
   
-  // Fallback data jika 'movie' null/undefined (Mencegah Blank Screen)
+  // Fallback data
   const displayMovie = movie || {
     title: "TRON ARES (2025)",
     img: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ8tq8lygfqv4hEIDsAjS88Rdh-z99CusKQyg&s",
@@ -70,20 +76,22 @@ export default function DetailPage({
     times: ["12:30", "14:30", "16:40", "18:50"],
   };
 
-  // --- LOGIC HANDLE BOOKING ---
+  // --- LOGIC HANDLERS ---
   const handleBook = (time) => {
-    // 1. Cek User Login
     if (!user) {
-      setShowLoginModal(true); // Munculkan Modal
+      setShowLoginModal(true);
       return;
     }
-
-    // 2. Lanjut Booking jika function tersedia
     if (typeof onNavigateBooking === "function") {
       onNavigateBooking(displayMovie, cinemaToShow.name, time);
     } else {
       console.error("Error: onNavigateBooking prop is missing!");
     }
+  };
+
+  const handleToggleWishlist = () => {
+    // Nanti disini bisa ditambah logika simpan ke LocalStorage/Backend
+    setIsWishlisted(!isWishlisted);
   };
 
   return (
@@ -97,25 +105,19 @@ export default function DetailPage({
       {showLoginModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
            <div className="bg-white rounded-2xl p-6 w-80 shadow-2xl relative animate-in zoom-in-95 duration-200 text-center mx-4">
-              {/* Tombol Close (X) */}
               <button 
                 onClick={() => setShowLoginModal(false)} 
                 className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X size={20} />
               </button>
-
-              {/* Icon Gembok */}
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  <Lock className="text-red-500 w-8 h-8" />
               </div>
-
               <h3 className="text-xl font-bold text-[#2a4c44] mb-2">Akses Dibatasi</h3>
               <p className="text-gray-500 text-sm mb-6 leading-relaxed">
                 Anda harus login terlebih dahulu untuk memilih kursi dan memesan tiket.
               </p>
-
-              {/* Tombol Aksi */}
               <div className="flex flex-col gap-3">
                  <button 
                     onClick={onNavigateLogin} 
@@ -139,14 +141,30 @@ export default function DetailPage({
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl font-black mb-6 tracking-tight">Detail Film</h2>
           
-          {/* INFO MOVIE */}
-          <div className="flex flex-col md:flex-row gap-8 items-start">
-            <img
-              src={displayMovie.poster_url || displayMovie.img}
-              alt={displayMovie.title}
-              className="w-full md:w-64 aspect-[2/3] object-cover rounded-xl shadow-2xl flex-shrink-0 border-2 border-white/10"
-              onError={(e) => {e.target.onerror = null; e.target.src = "https://via.placeholder.com/300x450?text=No+Image";}}
-            />
+          {/* INFO MOVIE SECTION (Updated) */}
+          <div className="flex flex-col md:flex-row gap-8 items-start relative">
+            
+            {/* WRAPPER GAMBAR + TOMBOL WISHLIST */}
+            <div className="relative w-full md:w-64 aspect-[2/3] flex-shrink-0">
+                <img
+                src={displayMovie.poster_url || displayMovie.img}
+                alt={displayMovie.title}
+                className="w-full h-full object-cover rounded-xl shadow-2xl border-2 border-white/10"
+                onError={(e) => {e.target.onerror = null; e.target.src = "https://via.placeholder.com/300x450?text=No+Image";}}
+                />
+
+                {/* --- TOMBOL WISHLIST BARU --- */}
+                <button
+                    onClick={handleToggleWishlist}
+                    className="absolute top-3 right-3 p-3 bg-white/20 backdrop-blur-md rounded-full shadow-lg transition-all hover:scale-110 active:scale-95 border border-white/30 group"
+                >
+                    <Heart 
+                        size={24} 
+                        className={`transition-all duration-300 ${isWishlisted ? "fill-red-500 text-red-500" : "text-white group-hover:text-red-300"}`} 
+                    />
+                </button>
+            </div>
+
             <div className="flex flex-col">
               <span className="text-lg font-medium text-amber-300">
                 Tayang : {displayMovie.release || "Coming Soon"}
@@ -170,7 +188,7 @@ export default function DetailPage({
             </div>
           </div>
 
-          {/* TABS & JADWAL */}
+          {/* TABS & JADWAL (Tidak ada perubahan) */}
           <div className="mt-12">
             <div className="flex gap-8 border-b-2 border-white/20">
               {["jadwal", "detail"].map((tab) => (
@@ -191,8 +209,6 @@ export default function DetailPage({
             {/* KONTEN TAB: JADWAL */}
             {activeTab === "jadwal" && (
               <div className="py-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                
-                {/* Tanggal */}
                 <div className="flex gap-3 overflow-x-auto py-2 pb-4 scrollbar-hide">
                   {dates.map((d) => (
                     <DateChip
@@ -205,7 +221,6 @@ export default function DetailPage({
                   ))}
                 </div>
 
-                {/* Filter & Search */}
                 <div className="flex items-center gap-4 my-6 bg-[#2a4c44]/30 p-3 rounded-xl backdrop-blur-sm border border-white/5">
                   <button className="p-2 rounded-lg bg-[#2a4c44] hover:bg-[#3a6a5e] text-white transition">
                     <Filter size={20} />
@@ -219,7 +234,6 @@ export default function DetailPage({
                   </button>
                 </div>
 
-                {/* Kota */}
                 <div className="flex flex-wrap gap-2 mb-8">
                   {cities.map((c) => (
                     <CityChip
@@ -231,7 +245,6 @@ export default function DetailPage({
                   ))}
                 </div>
 
-                {/* List Bioskop & Jam Tayang */}
                 <div className="bg-[#f5f1dc] rounded-2xl p-6 shadow-xl text-[#2d3e50]">
                   <div className="mb-4">
                     <h3 className="text-xl font-black text-[#2a4c44]">
@@ -246,7 +259,7 @@ export default function DetailPage({
                     {cinemaToShow.times.map((time) => (
                       <button
                         key={time}
-                        onClick={() => handleBook(time)} // <--- INI AKAN CEK LOGIN DULU
+                        onClick={() => handleBook(time)}
                         className="py-2 px-1 border-2 border-[#2a4c44]/20 text-[#2a4c44] font-bold rounded-lg hover:bg-[#2a4c44] hover:text-white hover:border-[#2a4c44] transition-all duration-200 active:scale-95 text-sm"
                       >
                         {time}

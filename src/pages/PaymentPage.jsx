@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import { ArrowLeft, Calendar, Clock, MapPin, Ticket, ShieldCheck, Loader2, QrCode, Wallet, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
-// --- HELPER FORMAT RUPIAH ---
+const API_BASE_URL = "https://cinix-be.vercel.app/payment";
+
 const formatIDR = (value) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -13,12 +15,9 @@ const formatIDR = (value) => {
 };
 
 // --- COMPONENTS KECIL ---
-
 const PaymentHeader = ({ onBack }) => (
   <div className="bg-white shadow-sm px-6 py-4 flex items-center gap-4 sticky top-0 z-50">
-    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition">
-      <ArrowLeft className="text-[#2a4c44]" />
-    </button>
+    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition"><ArrowLeft className="text-[#2a4c44]" /></button>
     <h1 className="text-xl font-bold text-[#2a4c44]">Ringkasan Pembayaran</h1>
   </div>
 );
@@ -43,28 +42,17 @@ const MovieSummaryCard = ({ movie, cinema, time, quantity, seats }) => (
   </div>
 );
 
-const PaymentMethodItem = ({ id, name, iconUrl, isSelected, onClick }) => {
-  return (
+const PaymentMethodItem = ({ id, name, iconUrl, isSelected, onClick }) => (
     <div 
       onClick={() => onClick(id)}
       className={`border-2 rounded-xl p-4 flex items-center justify-between cursor-pointer transition-all duration-200 ${
-        isSelected 
-        ? "border-amber-500 bg-amber-50 shadow-md transform scale-[1.01]" 
-        : "border-gray-100 hover:border-gray-300 bg-white"
+        isSelected ? "border-amber-500 bg-amber-50 shadow-md transform scale-[1.01]" : "border-gray-100 hover:border-gray-300 bg-white"
       }`}
     >
       <div className="flex items-center gap-4">
         <div className="w-14 h-10 rounded-lg flex items-center justify-center border border-gray-100 bg-white p-1 shadow-sm overflow-hidden">
            {iconUrl ? (
-             <img 
-                src={iconUrl} 
-                alt={name} 
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                    e.target.style.display = 'none'; 
-                    e.target.nextSibling.style.display = 'block'; 
-                }}
-             />
+             <img src={iconUrl} alt={name} className="w-full h-full object-contain" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'block'; }} />
            ) : null}
            <div style={{ display: iconUrl ? 'none' : 'block' }}>
                {id === 'qris' ? <QrCode className="text-gray-600" /> : <Wallet className="text-blue-500" />}
@@ -72,28 +60,16 @@ const PaymentMethodItem = ({ id, name, iconUrl, isSelected, onClick }) => {
         </div>
         <span className="font-bold text-gray-700 text-lg">{name}</span>
       </div>
-      
-      {isSelected && (
-        <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
-          <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
-        </div>
-      )}
+      {isSelected && <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-sm"><div className="w-2.5 h-2.5 bg-white rounded-full"></div></div>}
     </div>
-  );
-};
+);
 
 const PriceSummary = ({ pricePerTicket, quantity, adminFee, totalAmount }) => (
   <div className="bg-white rounded-3xl p-6 shadow-lg mb-8">
     <h3 className="font-bold text-[#2a4c44] mb-4 text-lg">Rincian Biaya</h3>
     <div className="space-y-3 text-sm font-medium">
-      <div className="flex justify-between text-gray-500">
-        <span>Tiket ({quantity}x)</span>
-        <span>{formatIDR(pricePerTicket * quantity)}</span>
-      </div>
-      <div className="flex justify-between text-gray-500">
-        <span>Biaya Layanan</span>
-        <span>{formatIDR(adminFee)}</span>
-      </div>
+      <div className="flex justify-between text-gray-500"><span>Tiket ({quantity}x)</span><span>{formatIDR(pricePerTicket * quantity)}</span></div>
+      <div className="flex justify-between text-gray-500"><span>Biaya Layanan</span><span>{formatIDR(adminFee)}</span></div>
       <div className="border-t border-dashed border-gray-300 my-3 pt-4 flex justify-between items-center">
         <span className="font-bold text-[#2a4c44] text-lg">Total Bayar</span>
         <span className="font-black text-amber-600 text-xl">{formatIDR(totalAmount)}</span>
@@ -104,17 +80,16 @@ const PriceSummary = ({ pricePerTicket, quantity, adminFee, totalAmount }) => (
 
 // --- MAIN PAGE ---
 export default function PaymentPage({ onNavigateHome, movie, cinema, time, user, quantity, seats }) {
-  console.log("DATA USER DI PAYMENT:", user);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("qris");
-  
-  // STATE BARU: Untuk Modal Sukses
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const pricePerTicket = 50000;
   const adminFee = 3000;
   const totalAmount = (pricePerTicket * (quantity || 1)) + adminFee;
+
+  // State yang dibawa dari BookingPage (seharusnya ada schedule_id di sini)
+  // seats harusnya array ID, bukan label "A1". Tapi kita sesuaikan nanti.
 
   const methods = [
     { id: "qris", name: "QRIS", icon: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Commons_QR_code.png/600px-Commons_QR_code.png" },
@@ -125,42 +100,95 @@ export default function PaymentPage({ onNavigateHome, movie, cinema, time, user,
   const handlePayment = async () => {
     setLoading(true);
     try {
+      // 1. AMBIL TOKEN (WAJIB)
+      const token = localStorage.getItem("token");
+      
+      if (!token) {
+        alert("Sesi Anda habis. Silakan login ulang.");
+        navigate('/login');
+        return;
+      }
+
+      // 2. SIAPKAN PAYLOAD (SESUAI REQUEST BACKEND)
+      // Backend minta: { schedule_id, seats, amount }
+      
       const payload = {
-        id: Date.now(), 
-        user_id: user?.id || "guest",
-        movie_title: movie.title,
-        movie_poster: movie.poster_url || movie.img,
-        cinema_name: cinema,
-        showtime: time,
+        // PERHATIKAN: schedule_id harusnya didapat dari database (Booking Page).
+        // Kalau error 404 "Schedule tidak ditemukan", minta ID valid ke Backend Dev.
+        schedule_id: "02c0037c-3b6e-40f0-939a-b6ac42cd086e", // CONTOH ID VALID DARI LOG BACKEND KAMU
+        
+        // Backend minta array ID kursi, bukan nama. 
+        // Kalau error 400, berarti Backend butuh ID UUID kursi, bukan "A1".
+        // Untuk sekarang kita kirim array string dulu.
         seats: seats, 
-        quantity: quantity,
-        total_amount: totalAmount,
-        booking_date: new Date().toISOString(),
-        status: "Lunas"
+        
+        amount: totalAmount // Backend minta 'amount', bukan 'total_amount'
       };
 
-      // Simulasi delay (API Call)
-      await new Promise(r => setTimeout(r, 1500)); 
+      console.log("PAYLOAD KE BE:", payload);
 
-     if (user && user.id) {
-          const storageKey = `tickets_${user.id}`;
-          
-          const existingTickets = JSON.parse(localStorage.getItem(storageKey) || "[]");
-          const updatedTickets = [payload, ...existingTickets]; 
-          
-          localStorage.setItem(storageKey, JSON.stringify(updatedTickets));
+      // 3. TEMBAK API (HYBRID: COOKIE + HEADER)
+      const response = await axios.post(API_BASE_URL, payload, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      console.log("RESPONSE SUKSES:", response.data);
+      
+      // 4. AMBIL URL MIDTRANS
+      const responseData = response.data;
+      const midtransUrl = responseData.snap?.redirect_url || 
+                          responseData.payment?.midtrans_response?.redirect_url;
+
+      if (midtransUrl) {
+          // SIMPAN HISTORY FRONTEND
+          if (user && user.id) {
+              const storageKey = `tickets_${user.id}`;
+              const existingTickets = JSON.parse(localStorage.getItem(storageKey) || "[]");
+              
+              // Simpan data lengkap buat tampilan UI MyTickets
+              const newTicketUI = {
+                  id: responseData.booking?.id_booking || Date.now(), 
+                  movie_title: movie.title,
+                  movie_poster: movie.poster_url || movie.img,
+                  cinema_name: cinema,
+                  showtime: time,
+                  seats: seats,
+                  quantity: quantity,
+                  total_amount: totalAmount,
+                  status: "Menunggu Pembayaran", 
+                  payment_link: midtransUrl 
+              };
+              
+              const updatedTickets = [newTicketUI, ...existingTickets]; 
+              localStorage.setItem(storageKey, JSON.stringify(updatedTickets));
+          }
+
+          // REDIRECT
+          window.location.href = midtransUrl; 
       } else {
-          console.warn("User ID tidak ditemukan, tiket tidak tersimpan permanen.");
+          alert("Gagal mendapatkan link pembayaran.");
       }
-      setLoading(false); 
-      setShowSuccessModal(true); 
-      setTimeout(() => {
-         navigate('/mytickets');
-      }, 2500);
 
     } catch (error) {
-      console.error("Gagal Bayar:", error);
-      alert("Gagal memproses pembayaran.");
+      console.error("ERROR PAYMENT:", error);
+      
+      if (error.response) {
+          // ERROR 401 = MASALAH TOKEN
+          if (error.response.status === 401) {
+              alert("Sesi login berakhir. Backend menolak token Anda. Silakan Login Ulang.");
+              localStorage.removeItem("token");
+              navigate('/login');
+          } 
+          // ERROR 400/404/500 = MASALAH DATA
+          else {
+              const msg = error.response.data?.message || "Gagal memproses transaksi.";
+              alert(`Gagal: ${msg}`);
+          }
+      } else {
+          alert("Terjadi kesalahan jaringan.");
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -171,25 +199,12 @@ export default function PaymentPage({ onNavigateHome, movie, cinema, time, user,
     <div className="min-h-screen bg-[#f5f1dc] font-sans pb-20 relative">
       <PaymentHeader onBack={() => navigate(-1)} />
 
-      {/* --- MODAL POP UP SUKSES --- */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl p-8 max-w-sm w-full mx-6 shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-300 relative overflow-hidden">
-            
-            {/* Efek Confetti Background (Simple CSS) */}
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-500 via-yellow-500 to-blue-500"></div>
-
-            <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 shadow-inner animate-bounce">
-                <CheckCircle className="text-green-600 w-12 h-12" strokeWidth={3} />
-            </div>
-            
-            <h2 className="text-2xl font-black text-[#2a4c44] mb-2">Pembayaran Berhasil!</h2>
-            <p className="text-gray-500 mb-6 font-medium">Tiket kamu sudah aman. Siapkan popcorn dan selamat menonton!</p>
-            
-            <div className="flex items-center gap-2 text-sm font-bold text-amber-500 bg-amber-50 px-4 py-2 rounded-full animate-pulse">
-                <Loader2 size={16} className="animate-spin" />
-                Mengalihkan ke Tiket Saya...
-            </div>
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-8 flex flex-col items-center">
+            <Loader2 size={48} className="text-amber-500 animate-spin mb-4" />
+            <h2 className="text-xl font-bold text-[#2a4c44]">Menghubungkan ke Pembayaran...</h2>
           </div>
         </div>
       )}
@@ -201,14 +216,7 @@ export default function PaymentPage({ onNavigateHome, movie, cinema, time, user,
            <h3 className="font-bold text-[#2a4c44] mb-4">Metode Pembayaran</h3>
            <div className="space-y-3">
                {methods.map((method) => (
-                   <PaymentMethodItem 
-                        key={method.id}
-                        id={method.id}
-                        name={method.name}
-                        iconUrl={method.icon}
-                        isSelected={paymentMethod === method.id}
-                        onClick={setPaymentMethod}
-                   />
+                   <PaymentMethodItem key={method.id} id={method.id} name={method.name} iconUrl={method.icon} isSelected={paymentMethod === method.id} onClick={setPaymentMethod} />
                ))}
            </div>
         </div>
@@ -217,10 +225,10 @@ export default function PaymentPage({ onNavigateHome, movie, cinema, time, user,
 
         <button 
           onClick={handlePayment}
-          disabled={loading || showSuccessModal} // Disable kalau lagi loading atau modal muncul
+          disabled={loading} 
           className="w-full bg-[#2a4c44] text-white py-4 rounded-full font-bold text-lg hover:bg-[#1e3630] transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          {loading ? <><Loader2 className="animate-spin" /> Memproses...</> : <><ShieldCheck /> Bayar Sekarang</>}
+          {loading ? "Sedang Memproses..." : <><ShieldCheck /> Lanjut ke Pembayaran</>}
         </button>
       </div>
     </div>
